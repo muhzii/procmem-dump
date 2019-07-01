@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <memory.h>
 
+#include "remote.c"
+
 #define DEFAULT_DUMP_FILE "procmem.dmp"
 
 /**
@@ -38,14 +40,15 @@ typedef struct mem_region_entry {
 void
 print_usage (char *bin_name)
 {
-    printf("\n%s <pid> [dump_path]\n", bin_name);
+    printf("\n%s [options] <pid> [dump_path]\n", bin_name);
     printf("\nDump process memory on Linux/ Android to be read by roch.\n");
     printf("project @ https://github.com/hatching/roach\n");
     printf("\narguments:\n");
     printf("\tpid\t\tTarget process id.\n");
     printf("\tdump_path\tPath to the output dump file.");
     printf("\noptions:\n");
-    printf("\t--help, -h\tShow this help text.\n");
+    printf("\t--remote, -r <address>\tSend dump file to remote host.\n");
+    printf("\t--help, -h\t\tShow this help text.\n");
 }
 
 /**
@@ -74,7 +77,7 @@ dump_mem_region (mem_region_entry region, FILE *mem_fp, FILE *dump_fp)
         int res;
         res = fwrite(page, 1, PAGE_SIZE, dump_fp);
         if (res != PAGE_SIZE) {
-            printf("Error writing to dump file.");
+            fprintf(stderr, "Error writing to dump file.");
             exit(1);
         }
     }
@@ -121,22 +124,31 @@ int
 main (int argc, char **argv)
 {
     char *dump_filepath = DEFAULT_DUMP_FILE;
+    char *remote_host = NULL;
     pid_t pid = 0;
 
     /* Parse command-line options */
     int arg_index = 1;
-    if (strcmp("--help", argv[arg_index]) == 0 ||
-        strcmp("-h", argv[arg_index]) == 0) {
-        print_usage(argv[0]);
-        return 0;
+    for (; arg_index < argc; arg_index++) {
+        if (strcmp("--help", argv[arg_index]) == 0 ||
+            strcmp("-h", argv[arg_index]) == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (strcmp("--remote", argv[arg_index]) == 0||
+                   strcmp("-r", argv[arg_index]) == 0) {
+            remote_host = argv[++arg_index];
+        } else {
+            break;
+        }
     }
+
 
     /* Parse arguments */
     int remaining_args = argc - arg_index;
     if (remaining_args > 0 && remaining_args < 3) {
         pid = atoi(argv[arg_index]);
         if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) {
-            printf("Failed to attach to pid: %d\n", pid);
+            fprintf(stderr, "Failed to attach to pid: %d\n", pid);
             return 1;
         }
         wait(NULL);
@@ -157,20 +169,27 @@ main (int argc, char **argv)
 
     FILE *maps_fp = fopen(maps_filepath, "r");
     if (!maps_fp) {
-        printf("Error opening maps file for pid: %d\n", pid);
+        fprintf(stderr, "Error opening maps file for pid: %d\n", pid);
         return 1;
     }
 
     FILE *mem_fp = fopen(mem_filepath, "r");
     if (!mem_fp) {
-        printf("Error opening mem file for pid: %d\n", pid);
+        fprintf(stderr, "Error opening mem file for pid: %d\n", pid);
         return 1;
     }
 
-    FILE *dump_fp = fopen(dump_filepath, "wb");
-    if (!dump_fp) {
-        printf("Error opening output dump file with path: %s\n", dump_filepath);
-        return 1;
+    FILE *dump_fp;
+    if (remote_host == NULL) {
+        dump_fp = fopen(dump_filepath, "wb");
+        if (!dump_fp) {
+            fprintf(stderr, "Error opening output dump file with path: %s\n", dump_filepath);
+            return 1;
+        }
+    } else {
+        char *ip = strtok(remote_host, ":");
+        char *port = strtok(NULL, "");
+        dump_fp = init_connection(ip, atoi(port), dump_filepath);
     }
 
     char *mem_map_str = NULL;
