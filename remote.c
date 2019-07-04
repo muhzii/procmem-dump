@@ -25,7 +25,8 @@
  * Initialize FILE connection with cuckoo's resultserver.
  */
 FILE*
-init_connection (char* ip, int port, char* filepath) {
+init_connection (char* ip, int port, char* filepath)
+{
     int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sockfd == -1) {
         fprintf(stderr, "Failed to create socket.\n");
@@ -49,4 +50,3 @@ init_connection (char* ip, int port, char* filepath) {
 
     return sockfp;
 }
-

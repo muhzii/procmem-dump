@@ -23,18 +23,17 @@
 #include <memory.h>
 
 #include "remote.c"
+#include "util.c"
 
 #define DEFAULT_DUMP_FILE "procmem.dmp"
 
-/**
- * The region struct later unpacked by roach.
- */
 typedef struct mem_region_entry {
     unsigned long long addr;
     unsigned int size;
-    unsigned int state;
     unsigned int type;
+    unsigned int inode;
     unsigned int protect;
+    char *filename;
 } mem_region_entry;
 
 void
@@ -52,15 +51,37 @@ print_usage (char *bin_name)
 }
 
 /**
- * Dump memory region with its memory info header to dump file.
+ * Dump a memory region with its memory info header.
  */
 void
 dump_mem_region (mem_region_entry region, FILE *mem_fp, FILE *dump_fp)
 {
-    /* Dump the info header */
+    /* GUARD PAGE - SKIP */
+    if (region.protect == PROT_NONE) {
+        return;
+    }
+
+    /* Read-only file-mappings - SKIP */
+    if (region.inode != 0 && region.protect == PROT_READ) {
+        return;
+    }
+
+    /* (ANDROID) Dalvik's cache or anynomous shared memory,
+       file-mappings from /vendor or /system - SKIP
+    */
+    if (region.filename != NULL &&
+        (startswith(region.filename, "/dev/ashmem/dalvik") || 
+         startswith(region.filename, "/data/dalvik-cache") ||
+         startswith(region.filename, "/system") ||
+         startswith(region.filename, "/vendor"))) {
+        return;
+    }
+
+    int state = 0;
+    /* Dump the info header (roach's header) */
     fwrite(&region.addr, sizeof(unsigned long long), 1, dump_fp);
     fwrite(&region.size, sizeof(unsigned int), 1, dump_fp);
-    fwrite(&region.state, sizeof(unsigned int), 1, dump_fp);
+    fwrite(&state, sizeof(unsigned int), 1, dump_fp);
     fwrite(&region.type, sizeof(unsigned int), 1, dump_fp);
     fwrite(&region.protect, sizeof(unsigned int), 1, dump_fp);
 
@@ -94,12 +115,16 @@ read_proc_map_info_header (char *map_str, mem_region_entry *region)
     char *start_addr = strtok(map_str, "-");
     char *end_addr = strtok(NULL, " ");
     char *protection = strtok(NULL, " ");
+    strtok(NULL, " "); strtok(NULL, " ");  /* skip offset and device entries */
+    char *inode = strtok(NULL, " ");
+    char *filename = strtok(NULL, "");
 
     region->addr = strtoull(start_addr, NULL, 16);
     region->size = strtoull(end_addr, NULL, 16) - region->addr;
+    region->inode = atoi(inode);
     region->type = 0;
-    region->state = 0;
     region->protect = 0;
+    region->filename = trim(filename);
 
     if (*(protection) == 'r') {
         region->protect |= PROT_READ;
@@ -141,7 +166,6 @@ main (int argc, char **argv)
             break;
         }
     }
-
 
     /* Parse arguments */
     int remaining_args = argc - arg_index;

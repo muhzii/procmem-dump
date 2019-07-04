@@ -3,11 +3,11 @@ ANDROID_TOOLCHAIN := $(ANDROID_NDK)/toolchains/llvm/prebuilt/linux-$(shell uname
 
 all:
 	@echo "\nSpecify the build target:\n"
-	@echo " * make host\t\t->\t build for the host machine.\n"
-	@echo " * make android-x86\t->\t build for Android x86 targets.\n"
-	@echo " * make android-x86_64\t->\t build for Android x86_64 targets.\n"
-	@echo " * make android-arm\t->\t build for Android arm targets.\n"
-	@echo " * make android-arm64\t->\t build for Android arm64 targets.\n"
+	@echo " * make host\t\t->\tbuild for the host machine.\n"
+	@echo " * make android-x86\t->\tbuild for Android x86 targets.\n"
+	@echo " * make android-x86_64\t->\tbuild for Android x86_64 targets.\n"
+	@echo " * make android-arm\t->\tbuild for Android arm targets.\n"
+	@echo " * make android-arm64\t->\tbuild for Android arm64 targets.\n"
 
 host:
 	gcc -o dumpmem dump_mem.c
