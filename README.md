@@ -13,11 +13,15 @@ to point to the path of your NDK folder (version >= r19). At which point you may
 From the help message:
 
 ```
-./dumpmem <pid> [dump_path]
+./dumpmem [options] <pid> [dump_path]
+
+Dump process memory on Linux/ Android to be read by roch.
+project @ https://github.com/hatching/roach
 
 arguments:
         pid             Target process id.
         dump_path       Path to the output dump file.
 options:
-        --help, -h      Show this help text.
+        --remote, -r <address>  Send dump file to remote host.
+        --help, -h              Show this help text.
 ```
